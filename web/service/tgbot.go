@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"embed"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -2349,7 +2350,7 @@ func (t *Tgbot) clientTelegramUserInfo(chatId int64, email string, messageID ...
 }
 
 func (t *Tgbot) searchClient(chatId int64, email string, messageID ...int) {
-	traffic, err := t.inboundService.GetClientTrafficByEmail(email)
+	traffic, inbound, err := t.inboundService.GetClientInboundByEmail(email)
 	if err != nil {
 		logger.Warning(err)
 		msg := t.I18nBot("tgbot.wentWrong")
@@ -2362,7 +2363,44 @@ func (t *Tgbot) searchClient(chatId int64, email string, messageID ...int) {
 		return
 	}
 
+	clients, err := t.inboundService.GetClients(inbound)
+	var streamSettings map[string]any
+	if err := json.Unmarshal([]byte(inbound.StreamSettings), &streamSettings); err != nil {
+		logger.Warning(err)
+	}
+	realitySettings := streamSettings["realitySettings"].(map[string]any)
+	settings := realitySettings["settings"].(map[string]any)
+
 	output := t.clientInfoMsg(traffic, true, true, true, true, true, true)
+
+	// add client key
+	var client model.Client
+	for _, c := range clients {
+		if c.Email == email {
+			client = c
+			break
+		}
+	}
+	path, err := t.settingService.GetWebDomain()
+	if err != nil {
+		logger.Warning(err)
+		path = ""
+	}
+	if len(clients) > 0 {
+		output += fmt.Sprintf("\n ```\n%s://%s@%s:%d?type=%s&security=%s&pbk=%s&fp=%s&sni=%s&sid=%s&spx=%s\n```",
+			inbound.Protocol,
+			client.ID,
+			path,
+			inbound.Port,
+			streamSettings["network"],
+			streamSettings["security"],
+			settings["publicKey"],
+			settings["fingerprint"],
+			realitySettings["serverNames"].([]string)[0],
+			realitySettings["shortIds"].([]any)[0],
+			email,
+		)
+	}
 
 	inlineKeyboard := tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
