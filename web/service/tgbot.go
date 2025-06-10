@@ -2409,7 +2409,7 @@ func (t *Tgbot) searchClient(chatId int64, email string, messageID ...int) {
 			streamSettings["security"],
 			settings["publicKey"],
 			settings["fingerprint"],
-			realitySettings["serverNames"].([]string)[0],
+			realitySettings["serverNames"].([]any)[0],
 			realitySettings["shortIds"].([]any)[0],
 			email,
 		)
